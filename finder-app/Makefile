@@ -12,4 +12,4 @@ writer.o:
 	$(CC) $(CFLAGS) -c writer.c
 
 clean:
-	rm *.o
+	rm *.o writer
