@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +22,8 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+	int ret = system(cmd);
+	return ret == 0;
 }
 
 /**
@@ -58,10 +64,31 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
+    pid_t pid = fork();
+    if ( pid < 0 ) {
+	perror("Fork error"); return false;	
+    }else
+    {
+    	if(pid == 0)
+	{
+	   execv(command[0], command);
+	   //return false;
+	   exit(1);
+	}else{
+           int status;
+	   int w = waitpid(pid, &status, WUNTRACED);
+            if (w == -1) {
+                perror("waitpid");
+                return false;
+            }
+	   if(!WIFEXITED(status))	
+		return false;
+	   else if (WEXITSTATUS(status))
+		return false;
+	}
+    }
     va_end(args);
-
-    return true;
+    return true;    
 }
 
 /**
@@ -92,7 +119,23 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
+   int childPid;
+   int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+   if (fd < 0) { perror("open file error"); return false; }
+   switch (childPid = fork()) {
+   case -1: perror("fork error"); return false;
+   case 0:
+      if (dup2(fd, 1) < 0) { perror("dup2 error"); return false; }
+      close(fd);
+      execv(command[0], command);
+      return false; 
+   default:
+      close(fd);
+      int status;
+      wait(&status);
+      if (WEXITSTATUS(status))
+	  return false;
+   }
     va_end(args);
 
     return true;
