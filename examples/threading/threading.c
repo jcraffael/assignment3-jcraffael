@@ -14,6 +14,27 @@ void* threadfunc(void* thread_param)
     // TODO: wait, obtain mutex, wait, release mutex as described by thread_data structure
     // hint: use a cast like the one below to obtain thread arguments from your parameter
     //struct thread_data* thread_func_args = (struct thread_data *) thread_param;
+    thread_data *thread_func_args = (thread_data *) thread_param;
+    int rc;
+    usleep(thread_func_args->wait_to_obtain_ms*1000);
+    rc = pthread_mutex_lock(thread_func_args->mutex);
+    if(rc != 0)
+    {
+    	ERROR_LOG("Mutex lock failed");
+	goto RETURN;
+    }
+    DEBUG_LOG("Mutex obtainted");
+    usleep(thread_func_args->wait_to_release_ms*1000);
+    rc = pthread_mutex_unlock(thread_func_args->mutex);
+    if(rc != 0)
+    {
+    	ERROR_LOG("Mutex release failed");
+	goto RETURN;
+    }
+    DEBUG_LOG("Mutex released");
+    thread_func_args->thread_complete_success = true;
+
+RETURN:
     return thread_param;
 }
 
@@ -28,6 +49,24 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
      *
      * See implementation details in threading.h file comment block
      */
-    return false;
+    thread_data* tData = malloc(sizeof(thread_data));
+    if(tData == NULL)
+    {
+       ERROR_LOG("Dynamic allocation failed.");
+       return false;
+    }
+    tData->wait_to_obtain_ms = wait_to_obtain_ms;
+    tData->wait_to_release_ms = wait_to_release_ms;
+    tData->mutex = mutex;
+    tData->thread_complete_success = false;
+
+    int rc = pthread_create(thread, NULL, threadfunc, (void*)tData);
+    if(rc != 0)
+    {
+       ERROR_LOG("Pthread creation failed.");
+       return false;
+    }
+    return true;
 }
+
 
