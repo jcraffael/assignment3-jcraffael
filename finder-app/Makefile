@@ -6,6 +6,7 @@ else
 endif
 CFLAGS = -Wall -g
 
+all: writer
 writer: writer.o
 	$(CC) -o writer writer.o
 writer.o:
