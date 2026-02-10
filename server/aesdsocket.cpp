@@ -26,16 +26,14 @@ class ServerSocket
 	struct sigaction new_action;
 	FILE* fptr;
 	char buff[DefaultSize];
+	char *totBuf;
 
 	ServerSocket()
 	{
 		memset(&new_action,0,sizeof(struct sigaction));
-		/*memset(&hints, 0, sizeof hints);
-		hints.ai_family = AF_UNSPEC;  // Either IPv4 or IPv6
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_flags = AI_PASSIVE; */
 		opt = 1, total_read_size = 0;
 		fptr = NULL;
+		totBuf = NULL;
 		client_addr.sin_family = AF_INET;
 		client_addr.sin_addr.s_addr = INADDR_ANY;
 		client_addr.sin_port = htons(PORT);
@@ -53,7 +51,7 @@ class ServerSocket
 		int total_size = 0;
 		int count = 0, bufSize = DefaultSize;
 		//char *recBuf = (char *)malloc(DefaultSize);
-		char *totBuf = (char *)malloc(DefaultSize);
+		totBuf = (char *)malloc(DefaultSize);
 		memset(totBuf, 0, DefaultSize);
 		do
 		{
@@ -65,22 +63,8 @@ class ServerSocket
 			count = recv(new_socket, buff, DefaultSize, 0);
 			if(count < 0)
 				break;
-			printf("Received buf: %c, received count is %d\n", buff[0], count);
+			printf("Received buf count is %d\n", count);
 			memcpy(totBuf + bufSize - DefaultSize, buff, sizeof(buff));
-			//strcat(totBuf, buff);
-			/*fptr = fopen(fileName, "a+");
-			if(fptr == NULL)
-			{
-				perror("File open");
-				break;	
-			}
-			
-			if(fwrite(recBuf, 1, count, fptr) < 0)
-			{
-				fprintf(stderr, "Write error!");
-				break;
-			}
-			fflush(fptr);*/
 			total_size += count;
 			
 		}while(count >= DefaultSize);
@@ -109,26 +93,11 @@ class ServerSocket
 		if(fptr == NULL)
 			errHandleExit("File open error!\n");
 		printf("File opened again\n");
-		size_t n = 0, len = 0;
-		char *totBuf = (char *)malloc(DefaultSize) ;
+		size_t n = 0;
+		totBuf = (char *)malloc(DefaultSize) ;
 		size_t bufSize = DefaultSize, total_size = 0, sent = 0;
 		//memset(recBuf, 0, bufSize);
 		memset(totBuf, 0, bufSize);
-		/*while((n = fread(recBuf, 1, bufSize, fptr)) > 0){
-			total_size += n;
-			printf("Read size is %ld\n", n);
-			if(n < bufSize)
-				break;
-			bufSize += n;
-			recBuf = (char *)realloc(ptr, bufSize);
-			if(recBuf == NULL)
-			{
-				perror("Realloc");
-				recBuf = ptr;
-				break;
-			}
-			memset(recBuf, 0, bufSize);
-		}*/
 		do{
 			bufSize += n;
 			totBuf = (char *)realloc(totBuf, bufSize);
@@ -136,21 +105,15 @@ class ServerSocket
 			if(totBuf == NULL)
 				break;
 			printf("To realloc to %ld size\n", bufSize);
-                         /*recBuf = (char *)realloc(recBuf, bufSize);
-                         if(recBuf == NULL)
-                         {
-                                 perror("Realloc");
-                                 break; 
-                         }*/
 			 n = fread(buff, 1, DefaultSize, fptr);
-			 printf("Read bytes %ld, read buf is %c\n", n, buff[0]);
+			 printf("Read bytes %ld\n", n);
 			total_size += n;
 			memcpy(totBuf + bufSize - DefaultSize, buff, sizeof(buff));
 			if(n < DefaultSize)
                                  break;
 		}while(n > 0);
 		
-		printf("The read buffer is %s with size %ld\n", totBuf, total_size);
+		printf("The read buffer with size %ld\n", total_size);
 		sent = send(new_socket, totBuf, total_size, 0);
 		printf("Sent buf with size %ld to socket %d\n", total_size, new_socket);
 		if(sent < 0)
@@ -159,7 +122,6 @@ class ServerSocket
 			return total_size;
 		
 		}
-		//free(recBuf);
 		free(totBuf);
 		fflush(fptr);
 		fclose(fptr);
@@ -172,7 +134,6 @@ class ServerSocket
 			printf("Caught sigint.\n");
 			close(getInstance().new_socket);
 			close(getInstance().server_fd);
-			//fclose(getInstance().fptr);
 			closelog();
 			remove(fileName);
 			syslog(LOG_DEBUG, "Caught signal, exiting...");
@@ -189,39 +150,25 @@ class ServerSocket
 
 	void initConfig()
 	{
-		/*if( sigaction(SIGTERM, &new_action, NULL) != 0 )
-		errHandleExit("Reg SIGTERM error.\n");
-		if( sigaction(SIGINT, &new_action, NULL) )
-		errHandleExit("Reg SIGINT error.\n");
-		new_action.sa_handler=signal_handler;*/
 		signal(SIGINT, signal_handler);
 		signal(SIGTERM, signal_handler);
 		openlog(NULL, 0, LOG_USER);
-		//if ((getaddrinfo(NULL, PORT, &(this->hints), &(this->res))) != 0)
-		// errHandleExit("getaddrinfo error\n");
 
-		if((server_fd = socket(AF_INET, SOCK_STREAM, 0/*res->ai_family, res->ai_socktype, res->ai_protocol*/)) < 0)
+		if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 			errHandleExit("socket error\n");
 
-		//if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
-		//	errHandleExit("setsockopt error\n");
-
-		/*fptr = fopen(fileName, "w");
-		if(fptr == NULL)
-		errHandleExit("File open error!\n");*/
 		system("rm /var/tmp/aesdsocketdata 2>/dev/null");
-	}
-
-	void operate()
-	{
-		if(bind(server_fd, (struct sockaddr*)&client_addr, sizeof(client_addr)/*res->ai_addr, res->ai_addrlen*/) < 0)
-		{errHandleExit("bind error\n");
-		printf("Bond!\n");}
-		//freeaddrinfo(res); // free the linked list
+		if(bind(server_fd, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0)
+			errHandleExit("bind error\n");
+		printf("Bond!\n");
 
 		if (listen(server_fd, 5) < 0)
 			errHandleExit("listen error\n");
 
+	}
+
+	void operate()
+	{
 		for(;;)
 		{
 			printf("Waiting for new connection...\n");
@@ -241,14 +188,7 @@ class ServerSocket
 			}
 			printf("Total read size is %d\n", total_read_size);
 			send_all();
-			//printf("Not sent all.\n");
-			/*const char *str = "Hahaha~";
-			int len = strlen(str);
-			int sent = send(new_socket, str, len, 0);
-                        printf("Sent buf: %s with size %d to socket %d\n", str, sent, new_socket);
-			*/
 			syslog(LOG_DEBUG, "Closed connection from %s", ip_addr);
-			//shutdown(new_socket, SHUT_WR);
 			printf("Closed connection from %s\n", ip_addr);
 		}
 	}
@@ -257,21 +197,26 @@ class ServerSocket
 
 int main(int argc, char *argv[])
 {
-    /*if(argc > 1)
-	{
-	int opt;
-	while((opt = getopt(argc, argv, “:if:lrx”)) != -1)
-	{
-	switch(opt)
-	{
-	case 'd':
-	break;
-	default:
-	break;
-	}
-	}
-	}*/
 	ServerSocket::getInstance().initConfig();
-	ServerSocket::getInstance().operate();
+	if(argc > 1)
+	{
+		if(!strcmp(argv[1], "-d"))
+		{
+			printf("Into Daemon mode!\n");
+			pid_t pid = fork();
+			if ( pid < 0 ) {
+				perror("Fork error"); return false;
+			}else
+			{
+				if(pid == 0)
+				{
+			  	ServerSocket::getInstance().operate();
+				}
+				else
+					return 0;
+		}
+	}
+    }
+    ServerSocket::getInstance().operate();
     return 0;
 }
