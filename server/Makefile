@@ -1,4 +1,4 @@
-CC=$(CROSS_COMPILE)g++
+CC=$(CROSS_COMPILE)gcc
 
 CFLAGS = -Wall -g
 
@@ -8,8 +8,8 @@ default: aesdsocket
 
 aesdsocket: aesdsocket.o
 	$(CC) -o aesdsocket aesdsocket.o
-aesdsocket.o: aesdsocket.cpp
-	$(CC) $(CFLAGS) -c aesdsocket.cpp
+aesdsocket.o: aesdsocket.c
+	$(CC) $(CFLAGS) -c aesdsocket.c
 
 clean:
 	-rm -f *.o aesdsocket
