@@ -58,7 +58,7 @@ pthread_t threads[MaxClient];
 
 void errHandleExit(const char* str)
 {
-	fprintf(stderr, str);
+	//fprintf(stderr, str);
 	exit(-1);
 }
 
