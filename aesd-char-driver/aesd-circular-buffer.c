@@ -32,6 +32,18 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     /**
     * TODO: implement per description
     */
+	int index = 0;
+	struct aesd_buffer_entry *entryptr = NULL;
+	char_offset++;
+	AESD_CIRCULAR_BUFFER_FOREACH(entryptr,buffer,index) {
+       	if(char_offset > entryptr->size)
+	   	{
+			char_offset -= entryptr->size;
+	   	}else{
+			*entry_offset_byte_rtn = char_offset-1;
+			return entryptr;
+	   	}
+	}
     return NULL;
 }
 
@@ -47,6 +59,23 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+	if(!buffer->full)
+	{
+		(buffer->entry)[buffer->in_offs] = *add_entry;
+		if(buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
+		{
+			buffer->in_offs = 0;
+			buffer->full = true;
+		}else{
+			buffer->in_offs++;
+		}
+	}else{
+		//free(&((buffer->entry)[buffer->in_offs]));
+		//printk("Freed old data and to hold new one\n");
+		(buffer->entry)[buffer->in_offs] = *add_entry;
+		buffer->in_offs++;
+		buffer->out_offs++;
+	}
 }
 
 /**
