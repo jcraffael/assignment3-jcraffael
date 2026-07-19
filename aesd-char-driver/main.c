@@ -98,7 +98,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 			retval = -EFAULT;
 			goto out;
 		}
-		memset(data->buf_entry, 0, default_size);
+		memset(data->buf_entry, 0, sizeof(struct aesd_buffer_entry));
 		data->buf_entry->buffptr = kmalloc(default_size, GFP_KERNEL);
 		if(data->buf_entry->buffptr == NULL)
 		{
