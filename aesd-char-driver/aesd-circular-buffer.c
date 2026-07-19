@@ -11,6 +11,7 @@
 #ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/printk.h>
+#include <linux/slab.h>
 #else
 #include <string.h>
 #endif
@@ -55,14 +56,26 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+bool aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
     /**
     * TODO: implement per description
     */
 	if(!buffer->full)
 	{
-		(buffer->entry)[buffer->in_offs] = *add_entry;
+		char *entry_buf = kmalloc(add_entry->size, GFP_KERNEL);
+		struct aesd_buffer_entry *ptr = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
+		if(ptr == NULL || entry_buf == NULL)
+		{
+			return false;
+		}	
+		ptr->buffptr = entry_buf;
+		ptr->size = add_entry->size;
+		
+ 		memcpy(ptr, add_entry, sizeof(struct aesd_buffer_entry));
+		memcpy(ptr->buffptr, add_entry->buffptr, ptr->size);
+		(buffer->entry)[buffer->in_offs] = *ptr;
+
 		if(buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
 		{
 			buffer->in_offs = 0;
@@ -71,14 +84,16 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 			buffer->in_offs++;
 		}
 	}else{
-#ifdef __KERNEL__
-		free(&((buffer->entry)[buffer->in_offs]));
+#ifdef __KERNEL__		
+		kfree((buffer->entry)[buffer->in_offs].buffptr);
+		kfree(&((buffer->entry)[buffer->in_offs]));
 		printk("Freed old data and to hold new one\n");
 #endif
 		(buffer->entry)[buffer->in_offs] = *add_entry;
 		buffer->in_offs++;
 		buffer->out_offs++;
 	}
+    return true;
 }
 
 /**

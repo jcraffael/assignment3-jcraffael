@@ -8,7 +8,7 @@
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
-unsigned int default_size = 4096;
+unsigned int default_size = 128;
 
 MODULE_AUTHOR("Chao Jiang");
 MODULE_LICENSE("Dual BSD/GPL");
@@ -50,21 +50,18 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 		return -ERESTARTSYS;
 
 	size_t *entry_offset_byte_rtn = NULL;
-	struct aesd_buffer_entry *entry ;
+	struct aesd_buffer_entry *entry = NULL;
 
 	loff_t offp = *f_pos;
 	size_t p_pos = 0;
 	size_t copy_size = 0;
-	char buffer[count + 1];
-	memset(buffer, 0, count + 1);
 	do{
 		entry = aesd_circular_buffer_find_entry_offset_for_fpos(&(data->cirBuf), offp, entry_offset_byte_rtn);
 		if(entry == NULL)
-		break;
+			break;
 
 		copy_size = (p_pos + entry->size) >= count ? count - p_pos : entry->size;
-		memcpy(buffer + p_pos, entry->buffptr, copy_size);
-		//copy_to_user(buf + p_pos, entry->buffptr, copy_size);
+		copy_to_user(buf + p_pos, entry->buffptr, copy_size);
 		offp += copy_size;
 		p_pos += copy_size;
 		retval += copy_size;
@@ -73,11 +70,10 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	if(retval > 0)
 	{
 		printk("In Write, retval is %d and count is %d", retval, count);
-		copy_to_user(buf, buffer, retval);
 	}
 
 out:
-mutex_unlock(&data->lock);
+	mutex_unlock(&data->lock);
     return retval;
 }
 
@@ -110,7 +106,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 			goto out;
 		}
 		memset(data->buf_entry->buffptr, 0, default_size);
-
 	}
 
 
@@ -126,7 +121,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
 	if (buf[count -1 ] == '\n')
 	{
-		aesd_circular_buffer_add_entry(&(data->cirBuf), data->buf_entry);
+		if(!aesd_circular_buffer_add_entry(&(data->cirBuf), data->buf_entry))
+			goto out;
 		*f_pos = 0;
 		kfree(data->buf_entry->buffptr);
 		data->buf_entry->buffptr = NULL;
@@ -212,8 +208,9 @@ void aesd_cleanup_module(void)
 		if(entryptr)
 		{
 			if(entryptr->buffptr)
-			kfree(entryptr->buffptr);
-
+			{	
+				kfree(entryptr->buffptr);
+			}
 			kfree(entryptr);
 			entryptr = NULL;
 		}
