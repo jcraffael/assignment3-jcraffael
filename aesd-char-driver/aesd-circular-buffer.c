@@ -10,6 +10,7 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
+#include <linux/printk.h>
 #else
 #include <string.h>
 #endif
@@ -70,8 +71,10 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 			buffer->in_offs++;
 		}
 	}else{
-		//free(&((buffer->entry)[buffer->in_offs]));
-		//printk("Freed old data and to hold new one\n");
+#ifdef __KERNEL__
+		free(&((buffer->entry)[buffer->in_offs]));
+		printk("Freed old data and to hold new one\n");
+#endif
 		(buffer->entry)[buffer->in_offs] = *add_entry;
 		buffer->in_offs++;
 		buffer->out_offs++;
