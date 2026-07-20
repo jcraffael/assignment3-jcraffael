@@ -55,19 +55,20 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	loff_t offp = *f_pos;
 	size_t p_pos = 0;
 	size_t copy_size = 0;
-	do{
+	//do{
 		entry = aesd_circular_buffer_find_entry_offset_for_fpos(&(data->cirBuf), offp, &entry_offset_byte_rtn);
 		if(entry == NULL)
-			break;
+			goto out;
 
 		copy_size = (p_pos + entry->size) >= count ? count - p_pos : entry->size;
 		copy_to_user(buf + p_pos, entry->buffptr, copy_size);
 		offp += copy_size;
 		p_pos += copy_size;
 		retval += copy_size;
-		PDEBUG("In read, copy size is %ld", copy_size);
+		*f_pos = offp;
+		PDEBUG("In read, copy size is %ld, copied str is %s", copy_size, entry->buffptr);
 
-	}while((p_pos + entry->size) < count);
+	//}while((p_pos + entry->size) < count);
 	if(retval > 0)
 	{
 		PDEBUG("In Read, retval is %d and count is %d", retval, count);
@@ -90,7 +91,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	if (mutex_lock_interruptible(&data->lock))
 		return -ERESTARTSYS;
 
-	int offset = *f_pos;
+//	int offset = *f_pos;
 	if(data->buf_entry == NULL)
 	{
 		data->buf_entry = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
@@ -107,7 +108,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 			goto out;
 		}
 		memset(data->buf_entry->buffptr, 0, default_size);
-		PDEBUG("In write. kmalloc space with offset %d", offset);
+		data->offset = 0;
+		PDEBUG("In write. kmalloc space");
 	}
 
 
@@ -116,7 +118,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	if (data->buf_entry->size + count > default_size)
 		count = default_size - data->buf_entry->size;
 
-	if (copy_from_user(data->buf_entry->buffptr + offset, buf, count)) {
+	if (copy_from_user(data->buf_entry->buffptr + data->offset, buf, count)) {
 		retval = -EFAULT;
 		goto out;
 	}
@@ -127,7 +129,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		data->buf_entry->size += count;
 		if(!aesd_circular_buffer_add_entry(&(data->cirBuf), data->buf_entry))
 			goto out;
-		*f_pos = 0;
+		//*f_pos = 0;
 		kfree(data->buf_entry->buffptr);
 		data->buf_entry->buffptr = NULL;
 		kfree(data->buf_entry);
@@ -137,7 +139,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	else
 	{
 		data->buf_entry->size += count;
-		*f_pos = offset + count;
+		data->offset += count;
+		//*f_pos = offset + count;
 		PDEBUG("In write saved in buf\n");
 	}
 
@@ -209,14 +212,17 @@ void aesd_cleanup_module(void)
 	struct aesd_buffer_entry *entryptr = NULL;
 	int index = 0;
 	AESD_CIRCULAR_BUFFER_FOREACH(entryptr,&(aesd_device.cirBuf),index) {
-		if(entryptr)
+		PDEBUG("In cleanup to iterate");
+		if(entryptr!= NULL)
 		{
-			if(entryptr->buffptr)
+			if(entryptr->buffptr != NULL)
 			{	
+				PDEBUG("index is %d, buffptr is %s", index, entryptr->buffptr);
 				kfree(entryptr->buffptr);
 			}
-			kfree(entryptr);
-			entryptr = NULL;
+			//kfree(entryptr);
+			PDEBUG("Kfreed entryptr");
+			//entryptr = NULL;
 		}
 	}
     unregister_chrdev_region(devno, 1);

@@ -38,6 +38,8 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 	struct aesd_buffer_entry *entryptr = NULL;
 	char_offset++;
 	AESD_CIRCULAR_BUFFER_FOREACH(entryptr,buffer,index) {
+		if(entryptr == NULL)
+			return NULL;
        	if(char_offset > entryptr->size)
 	   	{
 			char_offset -= entryptr->size;
@@ -61,21 +63,24 @@ bool aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+	char *entry_buf = kmalloc(add_entry->size, GFP_KERNEL);
+//	struct aesd_buffer_entry *ptr = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
+	if(/*ptr == NULL || */entry_buf == NULL)
+	{
+		return false;
+	}	
+	//ptr->buffptr = entry_buf;
+	//ptr->size = add_entry->size;
+	
+	//memcpy(ptr, add_entry, sizeof(struct aesd_buffer_entry));
+	memcpy(entry_buf, add_entry->buffptr, add_entry->size);
+	
 	if(!buffer->full)
 	{
-		char *entry_buf = kmalloc(add_entry->size, GFP_KERNEL);
-		struct aesd_buffer_entry *ptr = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
-		if(ptr == NULL || entry_buf == NULL)
-		{
-			return false;
-		}	
-		ptr->buffptr = entry_buf;
-		ptr->size = add_entry->size;
-		
- 		memcpy(ptr, add_entry, sizeof(struct aesd_buffer_entry));
-		memcpy(ptr->buffptr, add_entry->buffptr, ptr->size);
-		(buffer->entry)[buffer->in_offs] = *ptr;
-
+		//(buffer->entry)[buffer->in_offs] = *ptr;
+		(buffer->entry)[buffer->in_offs].size = add_entry->size;
+		(buffer->entry)[buffer->in_offs].buffptr = entry_buf;
+		printk("In added new entry with buf %s and size %ld, and in_offs %d\n", add_entry->buffptr, add_entry->size, buffer->in_offs);
 		if(buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
 		{
 			buffer->in_offs = 0;
@@ -89,7 +94,8 @@ bool aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 		kfree(&((buffer->entry)[buffer->in_offs]));
 		printk("Freed old data and to hold new one\n");
 #endif
-		(buffer->entry)[buffer->in_offs] = *add_entry;
+		(buffer->entry)[buffer->in_offs].size = add_entry->size;
+        memcpy((buffer->entry)[buffer->in_offs].buffptr, add_entry->buffptr, add_entry->size);
 		buffer->in_offs++;
 		buffer->out_offs++;
 	}
