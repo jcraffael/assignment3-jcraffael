@@ -49,14 +49,14 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	if (mutex_lock_interruptible(&data->lock))
 		return -ERESTARTSYS;
 
-	size_t *entry_offset_byte_rtn = NULL;
+	size_t entry_offset_byte_rtn = 0;
 	struct aesd_buffer_entry *entry = NULL;
 
 	loff_t offp = *f_pos;
 	size_t p_pos = 0;
 	size_t copy_size = 0;
 	do{
-		entry = aesd_circular_buffer_find_entry_offset_for_fpos(&(data->cirBuf), offp, entry_offset_byte_rtn);
+		entry = aesd_circular_buffer_find_entry_offset_for_fpos(&(data->cirBuf), offp, &entry_offset_byte_rtn);
 		if(entry == NULL)
 			break;
 
@@ -65,11 +65,12 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 		offp += copy_size;
 		p_pos += copy_size;
 		retval += copy_size;
+		PDEBUG("In read, copy size is %ld", copy_size);
 
 	}while((p_pos + entry->size) < count);
 	if(retval > 0)
 	{
-		printk("In Write, retval is %d and count is %d", retval, count);
+		PDEBUG("In Read, retval is %d and count is %d", retval, count);
 	}
 
 out:
@@ -106,6 +107,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 			goto out;
 		}
 		memset(data->buf_entry->buffptr, 0, default_size);
+		PDEBUG("In write. kmalloc space with offset %d", offset);
 	}
 
 
@@ -118,9 +120,11 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		retval = -EFAULT;
 		goto out;
 	}
-
+	
+	retval = count;
 	if (buf[count -1 ] == '\n')
 	{
+		data->buf_entry->size += count;
 		if(!aesd_circular_buffer_add_entry(&(data->cirBuf), data->buf_entry))
 			goto out;
 		*f_pos = 0;
@@ -128,13 +132,13 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		data->buf_entry->buffptr = NULL;
 		kfree(data->buf_entry);
 		data->buf_entry = NULL;
-		printk("In write added entry to cirBuf\n");
+		PDEBUG("In write added entry to cirBuf with count %ld", count);
 	}
 	else
 	{
 		data->buf_entry->size += count;
 		*f_pos = offset + count;
-		printk("In write saved in buf\n");
+		PDEBUG("In write saved in buf\n");
 	}
 
 out:
