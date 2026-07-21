@@ -63,21 +63,17 @@ bool aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+	if(add_entry == NULL)
+		return false;
 	char *entry_buf = kmalloc(add_entry->size, GFP_KERNEL);
-//	struct aesd_buffer_entry *ptr = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
 	if(/*ptr == NULL || */entry_buf == NULL)
 	{
 		return false;
 	}	
-	//ptr->buffptr = entry_buf;
-	//ptr->size = add_entry->size;
 	
-	//memcpy(ptr, add_entry, sizeof(struct aesd_buffer_entry));
 	memcpy(entry_buf, add_entry->buffptr, add_entry->size);
-	
 	if(!buffer->full)
 	{
-		//(buffer->entry)[buffer->in_offs] = *ptr;
 		(buffer->entry)[buffer->in_offs].size = add_entry->size;
 		(buffer->entry)[buffer->in_offs].buffptr = entry_buf;
 		printk("In added new entry with buf %s and size %ld, and in_offs %d\n", add_entry->buffptr, add_entry->size, buffer->in_offs);
@@ -90,14 +86,22 @@ bool aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 		}
 	}else{
 #ifdef __KERNEL__		
-		kfree((buffer->entry)[buffer->in_offs].buffptr);
-		kfree(&((buffer->entry)[buffer->in_offs]));
-		printk("Freed old data and to hold new one\n");
+		if((buffer->entry)[buffer->in_offs].buffptr != NULL)
+			kfree((buffer->entry)[buffer->in_offs].buffptr);
+		printk("Freed old data and to hold new one with in_offs %d and out_offs %d\n", buffer->in_offs, buffer->out_offs);
 #endif
 		(buffer->entry)[buffer->in_offs].size = add_entry->size;
-        memcpy((buffer->entry)[buffer->in_offs].buffptr, add_entry->buffptr, add_entry->size);
-		buffer->in_offs++;
-		buffer->out_offs++;
+		(buffer->entry)[buffer->in_offs].buffptr = entry_buf;
+		if(buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
+        {
+            buffer->in_offs = 0;
+        }else
+            buffer->in_offs++;
+
+		if(buffer->out_offs  == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
+    		buffer->out_offs = 0;
+		else
+    		buffer->out_offs++;
 	}
     return true;
 }
