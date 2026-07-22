@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
@@ -10,6 +11,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/unistd.h>
+#include <sys/stat.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
@@ -18,7 +20,13 @@
 #define DefaultSize 8192
 #define TimeSize 50
 #define MaxClient 20
-const char* fileName = "/var/tmp/aesdsocketdata";
+#define USE_AESD_CHAR_DEVICE 1
+
+#ifdef USE_AESD_CHAR_DEVICE
+	const char* fileName = "/dev/aesdchar";
+#else
+	const char* fileName = "/var/tmp/aesdsocketdata";
+#endif
 typedef struct thread_data
 {
 	int socketId;
@@ -104,7 +112,9 @@ void cleanAll()
 {
     close(ss.server_fd);
     closelog();
+#ifndef USE_AESD_CHAR_DEVICE
     remove(fileName);
+#endif
     pthread_mutex_destroy(&(ss.mutex));
     destroyThread(true);
     printf("Cleaned all\n");
@@ -175,6 +185,10 @@ int recv_total(int socketId, FILE* fptr, pthread_mutex_t *mutexPtr)
 	}while(count >= DefaultSize);
 
 	pthread_mutex_lock(mutexPtr);
+#ifdef USE_AESD_CHAR_DEVICE
+	if(open(fileName, O_RDONLY) == -1)
+		sleep(3);
+#endif
 	fptr = fopen(fileName, "a+");
 	if(fptr == NULL)
 	{
@@ -202,6 +216,11 @@ int send_all(int socketId, FILE* fptr, pthread_mutex_t *mutexPtr)
 	memset(totBuf, 0, bufSize);
 
 	pthread_mutex_lock(mutexPtr);
+	
+#ifdef USE_AESD_CHAR_DEVICE
+	if(open(fileName, O_RDONLY) == -1)
+		sleep(3);
+#endif
 	fptr = fopen(fileName, "r");
 	if(fptr == NULL)
 	{
@@ -311,7 +330,11 @@ void createThread(int sock, int num)
 	e->complete = false;
 	e->td = tData;
 	tData->done = &(e->complete);
+#ifndef USE_AESD_CHAR_DEVICE
 	int rc = pthread_create(&(threads[num]), NULL, num == 0 ? threadfuncTime : threadfuncData, (void*)tData);
+#else
+	int rc = pthread_create(&(threads[num]), NULL, threadfuncData, (void*)tData);
+#endif
 	if(rc != 0)
 	{
 		perror("Pthread creation failed.");
@@ -334,7 +357,7 @@ void operate()
 	{
 		printf("Waiting for new connection...\n");
 		int new_socket = -1;
-		//destroyThread(false);
+
 		
 		if (( new_socket = accept(ss.server_fd, (struct sockaddr*)&(ss.client_addr), &(ss.addrlen))) < 0)
 		{
